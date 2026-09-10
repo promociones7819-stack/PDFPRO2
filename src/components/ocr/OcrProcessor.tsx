@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
   Download,
   Copy,
@@ -23,12 +24,8 @@ import {
 import { getPdfjs } from "@/lib/pdf/pdfjs";
 import { saveBlob } from "@/lib/download";
 
-type Lang = "spa" | "eng";
-
-type OcrWorker = {
-  recognize: (image: unknown) => Promise<{ data: { text: string } }>;
-  terminate: () => Promise<unknown>;
-};
+import { createOcrWorker, type OcrWorker } from "@/lib/ocr/engine";
+import { ocrScale, type OcrEngine, type OcrLanguage } from "@/lib/ocr/result";
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
@@ -76,16 +73,17 @@ export function OcrProcessor({
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
   const [text, setText] = useState("");
-  const [language, setLanguage] = useState<Lang>("spa");
+  const [language, setLanguage] = useState<OcrLanguage>("spa");
+  const [engine, setEngine] = useState<OcrEngine>("paddle");
+  const runningRef = useRef(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null);
   const [pageTexts, setPageTexts] = useState<string[]>([]);
-  const workerRef = useRef<OcrWorker | null>(null);
   const cancelledRef = useRef(false);
   const initialRef = useRef<File | null>(null);
 
   async function processPdf(file: File | undefined) {
-    if (!file || busy) return;
+    if (!file || runningRef.current) return;
     if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
       toast.error("Solo se admiten archivos PDF.");
       return;
@@ -95,6 +93,7 @@ export function OcrProcessor({
       return;
     }
 
+    runningRef.current = true;
     setBusy(true);
     setProgress(0);
     setText("");
@@ -104,43 +103,48 @@ export function OcrProcessor({
     setStatus("Leyendo el archivo PDF…");
 
     let worker: OcrWorker | null = null;
+    let pdf: PDFDocumentProxy | undefined;
     cancelledRef.current = false;
 
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       setSourceBytes(bytes);
       const pdfjs = await getPdfjs();
-      const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+      pdf = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
       const numPages = pdf.numPages;
 
       setStatus("Inicializando el motor OCR (primera vez puede tardar)…");
-      const { createWorker } = await import("tesseract.js");
-      worker = (await createWorker(language)) as unknown as OcrWorker;
-      workerRef.current = worker;
+      worker = await createOcrWorker(engine, language);
 
       const parts: string[] = [];
       for (let i = 1; i <= numPages; i++) {
         if (cancelledRef.current) break;
         setStatus(`Procesando página ${i} de ${numPages}…`);
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 });
+        const original = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: ocrScale(original.width, original.height) });
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("canvas-2d-unavailable");
-        await page.render({
-          canvas,
-          canvasContext: ctx,
-          viewport,
-        } as Parameters<typeof page.render>[0]).promise;
+        try {
+          await page.render({
+            canvas,
+            canvasContext: ctx,
+            viewport,
+          } as Parameters<typeof page.render>[0]).promise;
 
-        const { data } = await worker!.recognize(canvas);
-        parts.push(`--- Página ${i} ---\n${(data.text ?? "").trim()}`);
-        setText(parts.join("\n\n"));
-        setProgress(Math.round((i / numPages) * 100));
-        canvas.width = 0;
-        canvas.height = 0;
+          const { data } = await worker!.recognize(canvas);
+          parts.push(`--- Página ${i} ---\n${(data.text ?? "").trim()}`);
+          setText(parts.join("\n\n"));
+          setPageTexts(parts.map((part) => part.replace(/^--- Página \d+ ---\n/, "")));
+          setProgress(Math.round((i / numPages) * 100));
+        } finally {
+          canvas.width = 0;
+          canvas.height = 0;
+          page.cleanup();
+        }
       }
 
       setPageTexts(parts.map((part) => part.replace(/^--- Página \d+ ---\n/, "")));
@@ -154,12 +158,19 @@ export function OcrProcessor({
     } catch (error) {
       if (!cancelledRef.current) {
         console.error(error);
-        setStatus("");
-        toast.error("No se ha podido procesar el PDF con OCR.");
+        setStatus(
+          "El reconocimiento no se ha completado. Puedes conservar el texto extraído y volver a intentarlo.",
+        );
+        toast.error(
+          engine === "paddle"
+            ? "PaddleOCR no pudo completar el reconocimiento. Comprueba la conexión para descargar los modelos o prueba Tesseract."
+            : "No se ha podido procesar el PDF con OCR.",
+        );
       }
     } finally {
       await worker?.terminate().catch(() => undefined);
-      workerRef.current = null;
+      await pdf?.destroy().catch(() => undefined);
+      runningRef.current = false;
       setBusy(false);
     }
   }
@@ -209,9 +220,27 @@ export function OcrProcessor({
             puede necesitar Internet para descargar el motor y el idioma.
           </p>
         </div>
+        <div className="w-56 space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">
+            Motor de reconocimiento
+          </label>
+          <Select value={engine} onValueChange={(v) => setEngine(v as OcrEngine)} disabled={busy}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="paddle">PaddleOCR · Multilingüe</SelectItem>
+              <SelectItem value="tesseract">Tesseract · Alternativo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="w-40 space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Idioma</label>
-          <Select value={language} onValueChange={(v) => setLanguage(v as Lang)} disabled={busy}>
+          <Select
+            value={language}
+            onValueChange={(v) => setLanguage(v as OcrLanguage)}
+            disabled={busy}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -260,7 +289,7 @@ export function OcrProcessor({
             variant="outline"
             onClick={() => {
               cancelledRef.current = true;
-              void workerRef.current?.terminate();
+              setStatus("Cancelando al finalizar la página actual…");
             }}
           >
             <X className="mr-2 size-4" /> Cancelar
@@ -279,7 +308,7 @@ export function OcrProcessor({
         />
       </div>
 
-      {(busy || progress > 0) && (
+      {(busy || status) && (
         <div className="space-y-2">
           <Progress value={progress} />
           <p className="text-xs text-muted-foreground">{status || `${progress}%`}</p>
@@ -316,7 +345,7 @@ export function OcrProcessor({
           </Button>
           <Button
             size="sm"
-            disabled={!pageTexts.length || !sourceBytes}
+            disabled={busy || !pageTexts.length || !sourceBytes}
             onClick={() => void downloadSearchablePdf()}
           >
             <FileSearch className="mr-2 size-4" /> Crear PDF buscable

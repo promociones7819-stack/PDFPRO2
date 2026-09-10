@@ -1,3 +1,5 @@
+import { createOcrWorker, type OcrWorker } from "@/lib/ocr/engine";
+import { ocrScale } from "@/lib/ocr/result";
 // Document Layer — extracción de texto por páginas. Ampliable con nuevos
 // parsers (DOCX, EPUB, imágenes con OCR, URLs) implementando DocumentParser.
 import { getPdfjs } from "@/lib/pdf/pdfjs";
@@ -15,17 +17,10 @@ export function detectKind(file: File): SourceKind | null {
 const PAGE_CHARS = 3000;
 const MIN_NATIVE_TEXT_CHARS = 40;
 
-type OcrWorker = {
-  recognize: (
-    image: HTMLCanvasElement,
-    options?: { rotateAuto?: boolean },
-  ) => Promise<{ data: { text?: string } }>;
-  terminate: () => Promise<unknown>;
-};
-
 /** Renderiza y reconoce únicamente una página sin capa de texto aprovechable. */
 async function ocrPage(page: PDFPageProxy, worker: OcrWorker) {
-  const viewport = page.getViewport({ scale: 1.8 });
+  const original = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: ocrScale(original.width, original.height) });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.floor(viewport.width));
   canvas.height = Math.max(1, Math.floor(viewport.height));
@@ -33,7 +28,7 @@ async function ocrPage(page: PDFPageProxy, worker: OcrWorker) {
   if (!context) throw new Error("canvas-2d-unavailable");
   await page.render({ canvasContext: context, viewport }).promise;
   try {
-    const result = await worker.recognize(canvas, { rotateAuto: true });
+    const result = await worker.recognize(canvas);
     return normalizeText(result.data.text ?? "");
   } finally {
     canvas.width = 0;
@@ -82,8 +77,7 @@ export const pdfParser: DocumentParser = {
         text = normalizeText(text);
         if (text.replace(/\s/g, "").length < MIN_NATIVE_TEXT_CHARS) {
           if (!worker) {
-            const { createWorker } = await import("tesseract.js");
-            worker = (await createWorker(["spa", "eng"])) as unknown as OcrWorker;
+            worker = await createOcrWorker("paddle", "spa");
           }
           const recognized = await ocrPage(page, worker);
           if (recognized.length > text.length) text = recognized;
@@ -95,8 +89,8 @@ export const pdfParser: DocumentParser = {
       }
     } finally {
       await worker?.terminate().catch(() => undefined);
+      await doc.destroy();
     }
-    void doc.destroy();
     return { pages, ocrPageCount };
   },
 };

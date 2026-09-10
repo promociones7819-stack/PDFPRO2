@@ -105,6 +105,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  // The static entry already owns <html>/<body> and mounts React into #root.
+  // Nesting another document here breaks React's delegated event traversal.
+  if (import.meta.env["VITE_STATIC_APP"]) {
+    return (
+      <>
+        <HeadContent />
+        {children}
+      </>
+    );
+  }
   return (
     <html lang="es">
       <head>

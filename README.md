@@ -1,3 +1,4 @@
+> OCR integrado con PaddleOCR: [configuración y alcance](OCR.md).
 > Repositorio PDFPRO2: https://github.com/promociones7819-stack/PDFPRO2
 > Preparación y publicación en Cloudflare: [CLOUDFLARE.md](CLOUDFLARE.md).
 

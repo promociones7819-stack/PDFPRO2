@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 // prerender SSR de TanStack Start: todas las herramientas trabajan en local.
 export default defineConfig({
   root: "desktop",
+  define: { "import.meta.env.VITE_STATIC_APP": "true" },
   publicDir: "../public",
   resolve: {
     tsconfigPaths: true,
