@@ -7,8 +7,10 @@ Repositorio: https://github.com/promociones7819-stack/PDFPRO2
 URL: https://pdfpro2.promociones7819.workers.dev
 
 Publicada el 10 de septiembre de 2026 mediante Wrangler, con el nombre `pdfpro2`.
-El repositorio está en GitHub. La publicación actual es directa; los despliegues
-automáticos desde GitHub todavía no están configurados.
+La aplicación está conectada a `promociones7819-stack/PDFPRO2`. Los cambios en
+`main` se compilan con `npm run build` y se publican con `npx wrangler deploy`.
+Se utiliza `package-lock.json` para instalar versiones reproducibles con npm.
+Las ramas distintas de producción generan versiones de vista previa.
 
 ## Configurar despliegues automáticos con GitHub
 

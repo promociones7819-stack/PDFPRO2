@@ -10,7 +10,14 @@ on:
       - "electron/**"
       - "package.json"
       - "vite.config.ts"
+      - "vite.desktop.config.ts"
+      - "desktop/**"
+      - "scripts/**"
+      - "package-lock.json"
       - ".github/workflows/build-mac-dmg.yml"
+
+permissions:
+  contents: read
 
 jobs:
   dmg:
@@ -28,12 +35,14 @@ jobs:
       - name: Preparar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
+          cache: npm
 
       - name: Instalar dependencias
-        run: |
-          npm install
-          npm install --no-save electron electron-builder
+        run: npm ci
+
+      - name: Comprobar funciones de PDF y OCR
+        run: npm test
 
       - name: Construir aplicación web local
         run: npm run build

@@ -1,0 +1,8 @@
+{
+  "name": "pdf-maestro",
+  "productName": "PDF Maestro",
+  "version": "1.0.0",
+  "description": "Editor local de PDF con OCR, conversión y herramientas de documentos",
+  "private": true,
+  "main": "main.cjs"
+}
