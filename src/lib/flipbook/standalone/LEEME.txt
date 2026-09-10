@@ -1,0 +1,35 @@
+FLIPBOOK AUTOCONTENIDO
+======================
+
+Para Windows: doble clic en iniciar-windows.bat.
+Para macOS/Linux: clic derecho en iniciar-mac-linux.command > Abrir.
+
+Si macOS dice que faltan privilegios, abre Terminal, escribe "chmod +x "
+(con el espacio final), arrastra iniciar-mac-linux.command a la ventana y
+pulsa Intro. Después usa clic derecho > Abrir.
+
+Si solo quieres hacer doble clic sin servidor, vuelve a PDF Maestro y elige
+Exportar > HTML único para Mac (.html).
+
+El navegador se abre solo en http://localhost:8080 con el flipbook listo.
+Unico requisito: Python 3 (https://www.python.org/downloads/).
+Sin internet, sin Node.js, sin npm, sin instalar dependencias.
+
+Contenido
+---------
+  index.html         Punto de entrada del flipbook
+  document.pdf       El PDF original (sin modificar)
+  hotspots.json      Hotspots interactivos creados en el editor
+  bookmarks.json     Indice / marcadores del PDF
+  assets/            Visor (viewer.js) y estilos
+  libs/              pdf.js y StPageFlip (copias locales)
+  servidor.py        Servidor local minimo (Python estandar)
+
+Por que no basta con doble clic en index.html
+---------------------------------------------
+Con el protocolo file:// los navegadores bloquean la lectura de archivos
+locales (PDF, JSON y workers). Por eso se incluye el servidor local: sigue
+siendo 100% local y sin internet.
+
+Esta carpeta se puede copiar a otro ordenador o a un USB y seguira
+funcionando exactamente igual.
