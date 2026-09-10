@@ -2,7 +2,15 @@
 
 Repositorio: https://github.com/promociones7819-stack/PDFPRO2
 
-## Cloudflare Workers con GitHub
+## Aplicación publicada
+
+URL: https://pdfpro2.promociones7819.workers.dev
+
+Publicada el 10 de septiembre de 2026 mediante Wrangler, con el nombre `pdfpro2`.
+El repositorio está en GitHub. La publicación actual es directa; los despliegues
+automáticos desde GitHub todavía no están configurados.
+
+## Configurar despliegues automáticos con GitHub
 
 1. En Cloudflare, abre Workers & Pages y crea una aplicación conectada a GitHub.
 2. Selecciona `promociones7819-stack/PDFPRO2` y la rama `main`.
@@ -15,7 +23,7 @@ Repositorio: https://github.com/promociones7819-stack/PDFPRO2
 
 La compilación genera `dist/`. Wrangler publica esos archivos y utiliza
 `index.html` como entrada de la aplicación SPA. No requiere servidor SSR.
-La conexión y el primer despliegue en Cloudflare se realizan posteriormente.
+Para actualizar la aplicación manualmente, ejecuta `npm run deploy:cloudflare`.
 
 ## Comprobación local
 
